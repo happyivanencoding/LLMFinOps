@@ -1,0 +1,1 @@
+{"name": "LLMFinOps", "short_name": "FinOps", "description": "私有 AI 用量与账户管理", "start_url": "/", "display": "standalone", "background_color": "#101525", "theme_color": "#101525", "icons": [{"src": "/mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]}

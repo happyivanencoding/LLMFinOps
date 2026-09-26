@@ -1,0 +1,44 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {chromium} from '@playwright/test';
+import {createApp} from '../server/index.mjs';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finops-browser-'));
+const output=path.resolve('.local/qa');fs.mkdirSync(output,{recursive:true});
+const sys=createApp({dataDir:dir,scheduler:false});
+const at=d=>new Date(Date.now()-d*86400000).toISOString();
+for(const [id,provider,name] of [['ds','deepseek','DeepSeek · Studio'],['oa','openai','OpenAI · Workspace'],['je','jev','Jev · Matching']])sys.store.saveAccount({id,provider,name,billing_mode:provider==='deepseek'?'prepaid':'api',currency:'USD'});
+sys.store.snapshot({account_id:'ds',currency:'USD',balance:24.81,source:'manual'});
+const providers=['deepseek','openai','jev'];
+const records=[];
+for(let d=0;d<30;d++)for(let k=0;k<3;k++){const p=providers[k],input=1200+d*113+k*280,outputTokens=120+k*400;records.push({id:`fixture-${d}-${k}`,trace_id:`flow-${d}`,project:k===0?'tgn-live':'onward',provider:p,account_id:['ds','oa','je'][k],feature:['narrator','cv.rewrite','match.score'][k],model:['deepseek-flash','gpt-luna','jev-latest'][k],started_at:at(d),duration_ms:1500+k*750+d*45,status:d===3&&k===1?'failed':'success',usage:{inputTokens:input,outputTokens,cachedInputTokens:input*.5},estimated_cost:(30-d)*.055+k*.032,source:'isolated-browser-fixture',scope:'call'});}
+sys.store.ingest(records);sys.store.saveBudget({id:'qa-budget',name:'Workspace budget',scope:'all',period:'monthly',amount:100,threshold:.8});sys.store.connector('qa','Fixture data source','test','connected',records.length);
+const server=sys.app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}`;
+const password=fs.readFileSync(path.join(dir,'initial-login.txt'),'utf8').match(/初始密码: (.+)/)[1];
+const browser=await chromium.launch({channel:'chrome',headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000},locale:'en-GB'});const pageErrors=[];page.on('pageerror',e=>pageErrors.push(e.message));const passed=[];
+const check=(name)=>{passed.push(name);console.log('PASS '+name)};
+async function goto(id){await page.goto(url+'/#'+id);await page.locator('.page-title').waitFor();await page.locator('.loading').waitFor({state:'hidden'}).catch(()=>{});await page.waitForTimeout(150)}
+async function noOverflow(){const box=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));assert.ok(box.scroll<=box.width+1,`Page overflow: ${JSON.stringify(box)}`)}
+try{
+ await page.addInitScript(()=>{localStorage.setItem('finops-lang','en');localStorage.setItem('finops-theme','light')});
+ await page.goto(url);await page.getByRole('heading',{name:'Welcome back'}).waitFor();await page.screenshot({path:path.join(output,'login-light.png')});
+ await page.locator('input[autocomplete="current-password"]').fill(password);await page.getByRole('button',{name:'Enter workspace'}).click();await page.getByRole('heading',{name:'Your AI spend, in focus.'}).waitFor();await page.locator('.hero-number').waitFor();check('Login and authenticated overview');
+ await page.screenshot({path:path.join(output,'desktop-light.png'),fullPage:true});await noOverflow();
+ await goto('calls');await page.locator('tbody tr').first().click();await page.getByRole('dialog').waitFor();await page.getByRole('heading',{name:'Observation details'}).waitFor();assert.ok(await page.locator('.trace-step').count()>=1);await page.screenshot({path:path.join(output,'trace-light.png'),fullPage:true});await page.getByRole('button',{name:'Close',exact:true}).click();check('Trace drilldown');
+ await page.getByPlaceholder('Search models, features, projects or traces…').fill('narrator');await page.waitForTimeout(500);assert.equal(await page.locator('tbody tr').count(),25);assert.ok((await page.locator('tbody').innerText()).includes('narrator'));check('Request search and pagination');
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('link',{name:'Export CSV'}).click();const download=await downloadPromise;assert.match(download.suggestedFilename(),/csv$/);check('CSV download');
+ await goto('accounts');await page.getByRole('button',{name:'Add account',exact:true}).click();await page.getByLabel('Account name',{exact:true}).fill('QA additional');await page.getByRole('button',{name:'Save account',exact:true}).click();await page.getByRole('heading',{name:'QA additional'}).waitFor();check('Account creation');
+ await goto('budgets');await page.getByRole('button',{name:'Create budget',exact:true}).click();await page.getByLabel('Budget name',{exact:true}).fill('QA budget');await page.getByLabel('Budget amount (USD)',{exact:true}).fill('25');await page.getByRole('button',{name:'Save',exact:true}).click();await page.getByRole('heading',{name:'QA budget',exact:true}).waitFor();check('Budget creation');
+ await goto('models');await page.getByRole('button',{name:'Versioned pricing'}).click();await page.getByRole('button',{name:'Add price version'}).click();await page.getByLabel('Exact model ID',{exact:true}).fill('qa-model');await page.getByLabel('Input / million',{exact:true}).fill('1');await page.getByLabel('Cache read / million',{exact:true}).fill('0.1');await page.getByLabel('Output / million',{exact:true}).fill('2');await page.getByLabel('Official pricing URL',{exact:true}).fill('https://example.test/pricing');await page.getByRole('button',{name:'Save version'}).click();await page.getByText('qa-model',{exact:true}).waitFor();check('Versioned price creation');
+ for(const name of ['projects','billing','alerts','integrations','settings']){await goto(name);assert.equal(await page.locator('.notice.danger').count(),0);await noOverflow();check('Page '+name)}
+ await page.getByRole('button',{name:'Dark',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');await page.getByRole('button',{name:'中文',exact:true}).click();await page.getByRole('heading',{name:'外观与语言'}).waitFor();check('Theme and language switching');
+ // Do not override preferences during subsequent navigation: remove the init script by opening a new page in the same context.
+ const context=page.context();const storage=await page.evaluate(()=>({lang:localStorage.getItem('finops-lang'),theme:localStorage.getItem('finops-theme')}));assert.equal(storage.lang,'zh');assert.equal(storage.theme,'dark');
+ await page.evaluate(()=>{location.hash='overview'});await page.getByRole('heading',{name:'AI 开支，一目了然。'}).waitFor();await page.screenshot({path:path.join(output,'desktop-dark-zh.png'),fullPage:true});
+ await page.setViewportSize({width:390,height:844});await noOverflow();await page.screenshot({path:path.join(output,'mobile-dark-zh.png'),fullPage:true});await page.getByRole('button',{name:'打开菜单'}).click();await page.locator('.sidebar').getByRole('button',{name:'账户与余额',exact:true}).click();await page.getByRole('heading',{name:'账户与余额',exact:true}).waitFor();await noOverflow();check('Mobile drawer and accounts');
+ await page.getByRole('button',{name:'切换为英语'}).click();await page.getByRole('heading',{name:'Accounts',exact:true}).waitFor();await page.getByRole('button',{name:'Change theme'}).click();await page.getByRole('button',{name:'Change theme'}).click();await page.screenshot({path:path.join(output,'mobile-light-en.png'),fullPage:true});check('Mobile English / light mode');
+ assert.deepEqual(pageErrors,[]);check('No browser JavaScript exceptions');
+ fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed,errors:pageErrors,screenshots:fs.readdirSync(output).filter(n=>n.endsWith('.png')),data:'isolated synthetic test fixture only'},null,2));
+ console.log(JSON.stringify({passed:passed.length,output}));
+}catch(error){await page.screenshot({path:path.join(output,'failure.png'),fullPage:true}).catch(()=>{});console.error(error);process.exitCode=1}finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));sys.close();fs.rmSync(dir,{recursive:true,force:true})}

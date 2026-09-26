@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.local
+.env*
+*.sqlite*
+*.db*
+*.log
+artifacts
+test-results
+playwright-report
