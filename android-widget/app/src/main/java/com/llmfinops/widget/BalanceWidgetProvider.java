@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.graphics.Color;
 import android.view.View;
 import android.widget.RemoteViews;
 import java.time.OffsetDateTime;
@@ -20,6 +21,9 @@ public class BalanceWidgetProvider extends AppWidgetProvider {
     static final String ACTION_REFRESH = "com.llmfinops.widget.REFRESH";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
     private static final int[] ROW_IDS = {R.id.row1,R.id.row2,R.id.row3,R.id.row4,R.id.row5,R.id.row6};
+    private static final int[] DOT_IDS = {R.id.dot1,R.id.dot2,R.id.dot3,R.id.dot4,R.id.dot5,R.id.dot6};
+    private static final int[] NAME_IDS = {R.id.name1,R.id.name2,R.id.name3,R.id.name4,R.id.name5,R.id.name6};
+    private static final int[] VALUE_IDS = {R.id.value1,R.id.value2,R.id.value3,R.id.value4,R.id.value5,R.id.value6};
 
     @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         updateAsync(context, goAsync());
@@ -80,15 +84,31 @@ public class BalanceWidgetProvider extends AppWidgetProvider {
 
     private static void applyRows(RemoteViews views, List<NetworkClient.Row> rows) {
         for (int i = 0; i < ROW_IDS.length; i++) {
-            int id = ROW_IDS[i];
             if (i < rows.size()) {
                 NetworkClient.Row row = rows.get(i);
-                views.setTextViewText(id, row.name + "    " + row.value);
-                views.setViewVisibility(id, View.VISIBLE);
+                views.setTextViewText(DOT_IDS[i], "●");
+                views.setTextColor(DOT_IDS[i], providerColor(row.provider));
+                views.setTextViewText(NAME_IDS[i], row.name);
+                views.setTextViewText(VALUE_IDS[i], row.value);
+                views.setViewVisibility(ROW_IDS[i], View.VISIBLE);
             } else {
-                views.setTextViewText(id, "");
-                views.setViewVisibility(id, View.GONE);
+                views.setTextViewText(NAME_IDS[i], "");
+                views.setTextViewText(VALUE_IDS[i], "");
+                views.setViewVisibility(ROW_IDS[i], View.GONE);
             }
+        }
+    }
+
+    private static int providerColor(String provider) {
+        if (provider == null) return Color.parseColor("#7A8B82");
+        switch (provider.toLowerCase(java.util.Locale.ROOT)) {
+            case "openai": return Color.parseColor("#3A8A63");
+            case "deepseek": return Color.parseColor("#5578C8");
+            case "gemini": return Color.parseColor("#7A63D0");
+            case "mimo": return Color.parseColor("#D9864F");
+            case "jev": return Color.parseColor("#C86591");
+            case "codex": return Color.parseColor("#66746D");
+            default: return Color.parseColor("#7A8B82");
         }
     }
 

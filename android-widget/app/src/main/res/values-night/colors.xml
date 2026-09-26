@@ -1,7 +1,9 @@
 <resources>
-    <color name="widget_bg">#18211C</color>
-    <color name="widget_text">#E8EEE8</color>
-    <color name="widget_muted">#91A298</color>
-    <color name="widget_line">#33443A</color>
-    <color name="widget_error">#F0A3AC</color>
+    <color name="widget_bg">#E9FFFFFF</color>
+    <color name="widget_text">#1C2923</color>
+    <color name="widget_value">#20342A</color>
+    <color name="widget_muted">#687970</color>
+    <color name="widget_line">#5FA8B9AF</color>
+    <color name="widget_accent">#3A8A63</color>
+    <color name="widget_error">#B54D59</color>
 </resources>
