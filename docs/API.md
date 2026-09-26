@@ -46,7 +46,7 @@ Login: `POST /api/login` with `username=admin` and password. Session is a 30-day
 
 - `GET /api/overview`, `/api/calls`, `/api/calls/export`: `days` or `from`/`to`, plus project/provider/environment/model/status/account/feature and search `q`. Calls support page/limit and `fallback=1`.
 - `GET /api/traces/:id`: operation summary and component observations.
-- `GET/POST /api/accounts`, `POST /api/accounts/:id/sync`, `/snapshot`: account metadata, write-only credentials, explicit balance snapshots.
+- `GET/POST /api/accounts`, `POST /api/accounts/:id/sync`, `/snapshot`: account metadata, write-only credentials, explicit balance snapshots. `DELETE /api/accounts/:id` removes the account connection, saved credentials and account-level balance/billing state while retaining historical request observations.
 - `GET /api/billing`: date/provider/account filters; statement amounts stay separate from observation estimates.
 - `POST /api/billing/import`: `{rows:[{account_id,day,currency,amount,provider_project,line_item}]}`. Keys deduplicate statement lines; negative credit adjustments are accepted. Import normalized statements, not token estimates.
 - `GET/POST /api/pricing`: exact provider/model match, USD-per-million rates, source URL, effective date. Duplicate effective versions are rejected.

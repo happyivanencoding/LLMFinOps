@@ -53,6 +53,16 @@ test('SDK record generates a persisted id and excludes prompt content from its s
 });
 
 
+test('account deletion removes connection state and credentials but preserves request ledger',()=>{
+ const dir=temporary(),sys=createApp({dataDir:dir,scheduler:false});try{
+  sys.store.saveAccount({id:'delete-me',name:'Delete me',provider:'mimo',billing_mode:'prepaid'});sys.secrets.setAccount('delete-me',{key:'synthetic-secret'});
+  sys.store.snapshot({account_id:'delete-me',currency:'USD',balance:3,source:'manual'});sys.store.ingest([fixture({id:'kept-call',account_id:'delete-me',provider:'mimo'})]);
+  sys.store.run('INSERT INTO billing_daily VALUES (?,?,?,?,?,?,?,?,?)','bill','delete-me','2026-09-26','','usage','USD',1,'statement-import',now());
+  const result=sys.store.deleteAccount('delete-me');sys.secrets.removeAccount('delete-me');
+  assert.equal(result.preserved_calls,1);assert.equal(sys.store.accounts().length,0);assert.equal(sys.store.one('SELECT COUNT(*) n FROM calls WHERE account_id=?','delete-me').n,1);assert.equal(sys.store.one('SELECT COUNT(*) n FROM snapshots WHERE account_id=?','delete-me').n,0);assert.equal(sys.store.one('SELECT COUNT(*) n FROM billing_daily WHERE account_id=?','delete-me').n,0);assert.equal(sys.store.one('SELECT sync_status FROM accounts WHERE id=?','delete-me').sync_status,'deleted');assert.equal(sys.secrets.resolve('delete-me'),'');
+ }finally{sys.close();fs.rmSync(dir,{recursive:true,force:true})}
+});
+
 test('positive CNY with zero USD does not trigger a false empty-account runway alert',()=>withStore(s=>{
  s.saveAccount({id:'ds',name:'DeepSeek',provider:'deepseek',currency:'USD',billing_mode:'prepaid'});
  s.ingest([fixture({id:'cost',account_id:'ds',provider:'deepseek',started_at:new Date().toISOString(),estimated_cost:7})]);

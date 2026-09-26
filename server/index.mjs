@@ -25,6 +25,7 @@ export function createApp({dataDir=process.env.FINOPS_DATA||path.join(root,'.loc
  app.get('/api/traces/:id',(req,res)=>res.json(store.trace(req.params.id)));
  app.get('/api/accounts',(req,res)=>res.json({items:store.accounts().map(a=>({...a,has_key:!!secrets.resolve(a.id),has_admin_key:!!secrets.resolve(a.id,'adminKey'),capabilities:capabilities[a.provider]})),capabilities}));
  app.post('/api/accounts',(req,res)=>{const a=store.saveAccount(req.body);if(req.body.api_key||req.body.admin_key)secrets.setAccount(a.id,{...(req.body.api_key?{key:text(req.body.api_key,1000)}:{}),...(req.body.admin_key?{adminKey:text(req.body.admin_key,1000)}:{})});res.json({id:a.id})});
+ app.delete('/api/accounts/:id',(req,res)=>{const result=store.deleteAccount(req.params.id);secrets.removeAccount(req.params.id);store.evaluateAlerts();res.json(result)});
  app.post('/api/accounts/:id/sync',async(req,res)=>res.json(await sync.sync(req.params.id)));
  app.post('/api/accounts/:id/snapshot',(req,res)=>{store.snapshot({...req.body,account_id:req.params.id,source:'manual'});store.evaluateAlerts();res.json({ok:true})});
  app.post('/api/sync',async(req,res)=>{const imports=await collector.run();const accounts=await sync.syncAll();res.json({imports,accounts})});
@@ -40,7 +41,7 @@ export function createApp({dataDir=process.env.FINOPS_DATA||path.join(root,'.loc
  app.get('/api/integrations',(req,res)=>res.json({items:store.all('SELECT * FROM connectors ORDER BY name').map(c=>({...c,config:parse(c.config,{})})),ingest_path:'/api/v1/calls',scheduler:{collection_seconds:60,account_sync_minutes:15,enabled:scheduler},not_collected:'不采集 prompt、回复正文、CV、邮件内容、API key。只存调用与账务元数据。'}));
  app.post('/api/import',(req,res)=>{const calls=req.body.calls;if(!Array.isArray(calls)||calls.some(c=>c.source==='demo'))fail('请提供真实调用记录数组');res.json(store.ingest(calls))});
  app.post('/api/collect',async(req,res)=>res.json(await collector.run()));
- app.get('/api/settings',(req,res)=>res.json({version:'0.1.0',timezone:'Europe/Paris',currency:'USD',retention:'保留历史账本；不自动删除',has_webhook:!!secrets.notification().url,counts:{calls:store.one('SELECT COUNT(*) n FROM calls').n,accounts:store.one('SELECT COUNT(*) n FROM accounts').n},data_directory_configured:true}));
+ app.get('/api/settings',(req,res)=>res.json({version:'0.1.0',timezone:'Europe/Paris',currency:'USD',retention:'保留历史账本；不自动删除',has_webhook:!!secrets.notification().url,counts:{calls:store.one('SELECT COUNT(*) n FROM calls').n,accounts:store.one("SELECT COUNT(*) n FROM accounts WHERE sync_status<>'deleted'").n},data_directory_configured:true}));
  app.post('/api/settings/password',(req,res)=>{secrets.setPassword(req.body.current,req.body.password);store.run('DELETE FROM sessions');res.json({ok:true,relogin:true})});
  app.post('/api/settings/ingest-token',(req,res)=>res.json({token:secrets.token()}));
  app.post('/api/settings/webhook',(req,res)=>{let url=text(req.body.url,1200);if(url&&!url.startsWith('https://'))fail('Webhook 必须使用 HTTPS');secrets.setNotification({url});res.json({ok:true})});
