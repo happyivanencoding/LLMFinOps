@@ -1,10 +1,10 @@
 import {now,uid,json,localDay,num,text,fail} from './lib.mjs';
 export const capabilities={
- openai:{name:'OpenAI',balance:false,billing:true,usage:true,credential:'Organization Admin API key 用于账单；推理 Key 不能替代',dashboard:'https://platform.openai.com/usage',docs:'https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage'},
+ openai:{name:'OpenAI',balance:false,billing:true,usage:true,credential:'Organization Admin API key 用于账单与 Usage；预付余额使用手动快照',dashboard:'https://platform.openai.com/settings/organization/billing/overview',docs:'https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage'},
  deepseek:{name:'DeepSeek',balance:true,billing:false,usage:false,credential:'普通 API key 可读取账户余额',dashboard:'https://platform.deepseek.com/usage',docs:'https://api-docs.deepseek.com/api/get-user-balance/'},
  gemini:{name:'Gemini',balance:false,billing:false,usage:false,credential:'调用用量经 SDK 采集；账单通过 JSON/CSV 导入，余额支持手动快照',dashboard:'https://aistudio.google.com/usage',docs:'https://ai.google.dev/gemini-api/docs/billing'},
  mimo:{name:'MiMo',balance:false,billing:false,usage:false,credential:'调用用量经 SDK 采集；公开余额接口尚未确认，支持手动快照',dashboard:'https://platform.xiaomimimo.com/',docs:'https://platform.xiaomimimo.com/'},
- jev:{name:'Jev',balance:false,billing:false,usage:false,credential:'SystemOne usage 由调用返回；公开 OpenAPI 没有账户余额接口',dashboard:'https://platform.typesafe.ai/',docs:'https://docs.typesafe.ai/models'},
+ jev:{name:'Jev',balance:false,billing:false,usage:false,credential:'SystemOne usage 由调用返回；公开 OpenAPI 未提供余额接口，余额使用手动快照',dashboard:'https://platform.typesafe.ai/',docs:'https://docs.typesafe.ai/models'},
  codex:{name:'Codex / 订阅',balance:false,billing:false,usage:false,credential:'订阅 Token 单列，不伪装成免费 API；支持已报告用量导入',dashboard:'https://chatgpt.com/',docs:'https://developers.openai.com/codex/'},
  other:{name:'自定义',balance:false,billing:false,usage:false,credential:'使用标准采集 API / JSON 导入',dashboard:'',docs:''}
 };
