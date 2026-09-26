@@ -51,3 +51,15 @@ test('SDK record generates a persisted id and excludes prompt content from its s
  const dir=temporary(),telemetry=createTelemetry({url:'http://127.0.0.1:1',token:'synthetic',project:'test',spoolDir:dir});
  try{await telemetry.record({provider:'jev',model:'jev-latest',prompt:'private-body',usage:{input_tokens:50,unexpected:'private-body'}});const names=fs.readdirSync(dir).filter(n=>n.endsWith('.json'));assert.equal(names.length,1);const raw=fs.readFileSync(path.join(dir,names[0]),'utf8'),v=JSON.parse(raw);assert.ok(v.id);assert.equal(v.trace_id,v.id);assert.ok(!raw.includes('private-body'));assert.equal(v.usage.input_tokens,50)}finally{await telemetry.close();fs.rmSync(dir,{recursive:true,force:true})}
 });
+
+
+test('positive CNY with zero USD does not trigger a false empty-account runway alert',()=>withStore(s=>{
+ s.saveAccount({id:'ds',name:'DeepSeek',provider:'deepseek',currency:'USD',billing_mode:'prepaid'});
+ s.ingest([fixture({id:'cost',account_id:'ds',provider:'deepseek',started_at:new Date().toISOString(),estimated_cost:7})]);
+ s.snapshot({account_id:'ds',currency:'USD',balance:0,source:'provider-api'});
+ s.snapshot({account_id:'ds',currency:'CNY',balance:100,source:'provider-api'});
+ s.alert('runway:ds:old','runway','Old incorrect alert','old');
+ const account=s.accounts()[0];assert.equal(account.runway_days_estimate,null);assert.equal(account.runway_unavailable_reason,'currency-mismatch');
+ assert.equal(s.evaluateAlerts().filter(a=>a.type==='runway').length,0);
+ assert.equal(s.one('SELECT status FROM alerts WHERE id=?','runway:ds:old').status,'resolved');
+}));

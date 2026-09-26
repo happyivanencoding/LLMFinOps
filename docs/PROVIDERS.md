@@ -24,3 +24,5 @@ Source references:
 The initial Jev catalog is input $0.042 per million, output free, effective only from its recorded verification date. Other imported costs remain their source project's estimates. Adding an OpenAI/DeepSeek/Gemini rate requires the correct model, context tier, service tier and billing assumptions; a single flat price is not a universal bill calculator.
 
 A successful credential read does not prove that several API keys have separate billing balances. Label shared billing groups explicitly and do not total their balances together.
+
+Runway is not computed for an account holding positive non-USD funds while observation costs are USD. A zero USD bucket alongside a funded CNY bucket must not generate an empty-account warning. Currency conversion is not silently guessed.
