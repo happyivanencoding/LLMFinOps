@@ -2,10 +2,13 @@ package com.llmfinops.widget;
 
 import android.app.Activity;
 import android.appwidget.AppWidgetManager;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.widget.Button;
@@ -20,6 +23,7 @@ public class ConfigActivity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private EditText server;
     private EditText token;
+    private TextView backgroundStatus;
     private int appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
 
     @Override protected void onCreate(Bundle state) {
@@ -29,6 +33,11 @@ public class ConfigActivity extends Activity {
             setResult(RESULT_CANCELED, new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId));
         }
         buildUi();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        updateBackgroundStatus();
     }
 
     @Override protected void onDestroy() {
@@ -63,6 +72,17 @@ public class ConfigActivity extends Activity {
         root.addView(server);
         root.addView(token);
 
+        backgroundStatus = new TextView(this);
+        backgroundStatus.setTextSize(13);
+        backgroundStatus.setTextColor(Color.rgb(84,96,90));
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.setMargins(0, dp(4), 0, dp(6));
+        root.addView(backgroundStatus, statusParams);
+
+        Button battery = button("允许后台刷新");
+        battery.setOnClickListener(v -> requestBackgroundAccess());
+        root.addView(battery);
+
         Button test = button("测试连接");
         test.setOnClickListener(v -> {
             if (!saveValues()) return;
@@ -96,6 +116,32 @@ public class ConfigActivity extends Activity {
         open.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(Prefs.server(this) + "/#overview"))));
         root.addView(open);
         setContentView(root);
+    }
+
+    private void updateBackgroundStatus() {
+        if (backgroundStatus == null) return;
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        boolean allowed = power != null && power.isIgnoringBatteryOptimizations(getPackageName());
+        backgroundStatus.setText(allowed
+            ? "后台刷新：已允许"
+            : "后台刷新：受系统省电限制。桌面 Widget 可能无法联网。");
+        backgroundStatus.setTextColor(allowed ? Color.rgb(54,123,89) : Color.rgb(184,77,85));
+    }
+
+    private void requestBackgroundAccess() {
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power != null && power.isIgnoringBatteryOptimizations(getPackageName())) {
+            Toast.makeText(this, "后台刷新已经允许", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            startActivity(new Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:" + getPackageName())
+            ));
+        } catch (ActivityNotFoundException e) {
+            startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+        }
     }
 
     private EditText field(String hint, String value, boolean password) {

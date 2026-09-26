@@ -17,8 +17,9 @@ LLMFinOps 提供一个轻量 Android companion，用于在手机桌面直接查�
 3. 点击“显示 Widget Token”。
 4. 安装 Android APK 并打开 LLMFinOps Widget。
 5. 服务器地址保持 `https://finops.thegreatnovel.com`。
-6. 粘贴 Widget Token，点击“测试连接”。
-7. 点击“保存并刷新 Widget”。
-8. 回到 Android 桌面，长按空白区域 → Widget → LLMFinOps Widget。
+6. 点击“允许后台刷新”，按系统提示允许 LLMFinOps Widget 不受电池优化限制。Samsung / Android 在省电模式下可能会阻断普通后台 DNS 与网络请求；这是桌面余额自动更新所必需的。
+7. 粘贴 Widget Token，点击“测试连接”。
+8. 点击“保存并刷新 Widget”。
+9. 回到 Android 桌面，长按空白区域 → Widget → LLMFinOps Widget。
 
-如果重新生成 Widget Token，已配置手机需要输入新的 Token。
+如果重新生成 Widget Token，已配置手机需要输入新的 Token。若 Widget 提示后台网络受系统省电限制，打开 LLMFinOps Widget App 并重新点击“允许后台刷新”。

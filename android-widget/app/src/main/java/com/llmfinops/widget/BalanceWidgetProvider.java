@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
+import android.os.PowerManager;
 import android.view.View;
 import android.widget.RemoteViews;
 import java.time.OffsetDateTime;
@@ -62,8 +63,9 @@ public class BalanceWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.refresh, refreshIntent);
 
-            String openUrl = summary != null ? summary.openUrl : Prefs.server(context) + "/#overview";
-            Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse(openUrl));
+            Intent open = summary != null
+                ? new Intent(Intent.ACTION_VIEW, Uri.parse(summary.openUrl))
+                : new Intent(context, ConfigActivity.class);
             PendingIntent openIntent = PendingIntent.getActivity(context, 12, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.widget_root, openIntent);
@@ -75,7 +77,7 @@ public class BalanceWidgetProvider extends AppWidgetProvider {
             } else {
                 applyRows(views, java.util.Collections.emptyList());
                 views.setTextViewText(R.id.updated, "");
-                views.setTextViewText(R.id.error, error == null ? "同步失败" : error);
+                views.setTextViewText(R.id.error, friendlyError(context, error));
                 views.setViewVisibility(R.id.error, View.VISIBLE);
             }
             manager.updateAppWidget(widgetId, views);
@@ -97,6 +99,17 @@ public class BalanceWidgetProvider extends AppWidgetProvider {
                 views.setViewVisibility(ROW_IDS[i], View.GONE);
             }
         }
+    }
+
+    private static String friendlyError(Context context, String error) {
+        String message = error == null ? "同步失败" : error;
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        boolean allowed = power != null && power.isIgnoringBatteryOptimizations(context.getPackageName());
+        if (!allowed && (message.contains("Unable to resolve host") || message.contains("No address associated with hostname"))) {
+            return "后台网络被系统省电限制。打开 LLMFinOps Widget → 允许后台刷新。";
+        }
+        if (message.length() > 120) return message.substring(0, 117) + "…";
+        return message;
     }
 
     private static int providerColor(String provider) {
