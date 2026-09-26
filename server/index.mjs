@@ -14,6 +14,10 @@ export function createApp({dataDir=process.env.FINOPS_DATA||path.join(root,'.loc
  app.use((req,res,next)=>{res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Cache-Control':'no-store'});next()});
  app.use(languageMiddleware);app.use(express.json({limit:'4mb'}));app.use(auth.checkOrigin);
  app.get('/health',(req,res)=>res.json({ok:true,application:'LLMFinOps',version:'0.1.0',revision:process.env.FINOPS_REVISION||'local'}));
+ const cleanBalancePrefs=value=>{const out={},accounts=new Set(store.accounts().map(a=>a.id));if(!value||typeof value!=='object'||Array.isArray(value))return out;for(const[id,list]of Object.entries(value)){if(!accounts.has(id)||!Array.isArray(list))continue;const currencies=[...new Set(list.filter(c=>['USD','EUR','CNY'].includes(c)))];if(currencies.length)out[id]=currencies}return out};
+ const balancePrefs=()=>cleanBalancePrefs(store.setting('balance_visibility_hidden',{}));
+ const widgetSummary=req=>{const hidden=balancePrefs(),items=store.accounts().map(a=>({id:a.id,name:a.name,provider:a.provider,billing_mode:a.billing_mode,balances:a.balances.filter(b=>!(hidden[a.id]||[]).includes(b.currency)).map(b=>({currency:b.currency,balance:b.balance,source:b.source,observed_at:b.observed_at}))}));const observed=items.flatMap(a=>a.balances.map(b=>b.observed_at)).filter(Boolean).sort().at(-1)||null;return{version:1,generated_at:now(),updated_at:observed,open_url:`https://${req.get('host')}/#overview`,accounts:items}};
+ app.get('/api/widget/summary',auth.widget,(req,res)=>res.json(widgetSummary(req)));
  app.get('/api/session',(req,res)=>res.json({authenticated:!!auth.authenticated(req),user:auth.authenticated(req)?{name:'Jingxuan',username:'admin'}:null}));
  app.post('/api/login',auth.login);app.post('/api/logout',auth.logout);
  app.post('/api/v1/calls',auth.ingest,(req,res)=>{const result=store.ingest(req.body.calls||[req.body]);const source=text(req.body.source)||'push-sdk';store.connector(source,source,'push','connected',store.one('SELECT COUNT(*) n FROM calls WHERE source=?',source)?.n||result.inserted);res.status(202).json(result)});
@@ -24,6 +28,8 @@ export function createApp({dataDir=process.env.FINOPS_DATA||path.join(root,'.loc
  app.get('/api/calls/export',(req,res)=>{const rows=store.filtered(req.query);if(rows.length>100000)fail('请缩小日期范围，每次导出最多 100,000 条');res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="llmfinops-calls.csv"'}).send(csv(rows,['id','trace_id','project','environment','provider','account_id','feature','model','started_at','status','duration_ms','input_tokens','cached_tokens','output_tokens','reasoning_tokens','total_tokens','cost_low','cost_high','cost_source','scope','source']))});
  app.get('/api/traces/:id',(req,res)=>res.json(store.trace(req.params.id)));
  app.get('/api/accounts',(req,res)=>res.json({items:store.accounts().map(a=>({...a,has_key:!!secrets.resolve(a.id),has_admin_key:!!secrets.resolve(a.id,'adminKey'),capabilities:capabilities[a.provider]})),capabilities}));
+ app.get('/api/preferences/balances',(req,res)=>res.json({hidden:balancePrefs()}));
+ app.post('/api/preferences/balances',(req,res)=>{const hidden=cleanBalancePrefs(req.body?.hidden||{});store.setSetting('balance_visibility_hidden',hidden);res.json({hidden})});
  app.post('/api/accounts',(req,res)=>{const a=store.saveAccount(req.body);if(req.body.api_key||req.body.admin_key)secrets.setAccount(a.id,{...(req.body.api_key?{key:text(req.body.api_key,1000)}:{}),...(req.body.admin_key?{adminKey:text(req.body.admin_key,1000)}:{})});res.json({id:a.id})});
  app.delete('/api/accounts/:id',(req,res)=>{const result=store.deleteAccount(req.params.id);secrets.removeAccount(req.params.id);store.evaluateAlerts();res.json(result)});
  app.post('/api/accounts/:id/sync',async(req,res)=>res.json(await sync.sync(req.params.id)));
@@ -44,6 +50,8 @@ export function createApp({dataDir=process.env.FINOPS_DATA||path.join(root,'.loc
  app.get('/api/settings',(req,res)=>res.json({version:'0.1.0',timezone:'Europe/Paris',currency:'USD',retention:'保留历史账本；不自动删除',has_webhook:!!secrets.notification().url,counts:{calls:store.one('SELECT COUNT(*) n FROM calls').n,accounts:store.one("SELECT COUNT(*) n FROM accounts WHERE sync_status<>'deleted'").n},data_directory_configured:true}));
  app.post('/api/settings/password',(req,res)=>{secrets.setPassword(req.body.current,req.body.password);store.run('DELETE FROM sessions');res.json({ok:true,relogin:true})});
  app.post('/api/settings/ingest-token',(req,res)=>res.json({token:secrets.token()}));
+ app.post('/api/settings/widget-token',(req,res)=>res.json({token:secrets.widgetToken()}));
+ app.post('/api/settings/widget-token/rotate',(req,res)=>res.json({token:secrets.rotateWidgetToken()}));
  app.post('/api/settings/webhook',(req,res)=>{let url=text(req.body.url,1200);if(url&&!url.startsWith('https://'))fail('Webhook 必须使用 HTTPS');secrets.setNotification({url});res.json({ok:true})});
  app.post('/api/settings/webhook/test',async(req,res)=>{const url=secrets.notification().url;if(!url)fail('尚未配置 webhook');const r=await fetchImpl(url,{method:'POST',headers:{'content-type':'application/json'},body:json({event:'llmfinops.test',title:'LLMFinOps 通知测试',at:now()}),signal:AbortSignal.timeout(10000)});if(!r.ok)fail(`Webhook HTTP ${r.status}`,502);res.json({ok:true})});
  app.use('/api',(req,res)=>res.status(404).json({error:'接口不存在'}));

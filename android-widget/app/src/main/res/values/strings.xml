@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">LLMFinOps Widget</string>
+    <string name="widget_title">LLMFinOps</string>
+    <string name="refresh">刷新余额</string>
+</resources>
